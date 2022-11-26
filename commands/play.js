@@ -119,7 +119,7 @@ module.exports = {
                 interaction.followUp(matrix.join('\n'));
                 guesses++;
 
-                if (guesses >= matrix.length) {
+                if (guesses >= matrix.length - 1) {
                     interaction.followUp(`You failed to solve ${word} in ${matrix.length} tries!`);
                     return messageCollector.stop()
                 }
