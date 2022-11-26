@@ -92,11 +92,6 @@ module.exports = {
             let messageCollector = interaction.channel.createMessageCollector({ filter: messageFilter, time: duration })
 
             messageCollector.on('collect', message => {
-                if (guesses >= matrix.length) {
-                    interaction.followUp(`You failed to solve ${word} in ${matrix.length} tries!`);
-                    return messageCollector.stop()
-                }
-
                 if (message.content === word) {
                     matrix[guesses] = '🟩🟩🟩🟩🟩'
                     interaction.followUp(matrix.join('\n'));
@@ -123,6 +118,11 @@ module.exports = {
                 matrix[guesses] = guess.join(''); 
                 interaction.followUp(matrix.join('\n'));
                 guesses++;
+
+                if (guesses >= matrix.length) {
+                    interaction.followUp(`You failed to solve ${word} in ${matrix.length} tries!`);
+                    return messageCollector.stop()
+                }
             });
 
             messageCollector.on('end', reason => {
