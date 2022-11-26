@@ -188,13 +188,10 @@ module.exports = {
 
                     if (guessLetter === solutionLetter) {
                         guess.push(EMOJI_CODES['green'][guessLetter]);
-                        // guess.push('🟩');
                     } else if (word.includes(guessLetter)) {
                         guess.push(EMOJI_CODES['yellow'][guessLetter]);
-                        // guess.push('🟨');
                     } else {
                         guess.push(EMOJI_CODES['gray'][guessLetter]);
-                        // guess.push('🔳');
                     }
                 }
 
