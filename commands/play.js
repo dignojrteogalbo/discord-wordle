@@ -200,12 +200,12 @@ module.exports = {
                 guesses++;
 
                 if (input === word) {
-                    interaction.followUp(`You guessed ${word} in ${guesses} tries!`);
+                    interaction.followUp(`You guessed **${word}** in ${guesses} tries!`);
                     return messageCollector.stop()
                 }
 
                 if (guesses >= matrix.length) {
-                    interaction.followUp(`You failed to solve ${word} in ${matrix.length} tries!`);
+                    interaction.followUp(`You failed to solve **${word}** in ${matrix.length} tries!`);
                     return messageCollector.stop()
                 }
             });
