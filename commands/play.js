@@ -3,11 +3,13 @@ const path = require('node:path');
 const events = require('node:events');
 const { SlashCommandBuilder } = require('discord.js');
 const { randomInt } = require('node:crypto');
+const { Stats } = require('node:fs');
 
-const NUM_LINES   = 5757; // number of lines in words.txt
+const NUM_LINES   = 5757;  // number of lines in words.txt
 const NUM_LETTERS = 5;     // 5 letters for a wordle word
 const NUM_BYTES   = 6;     // including '/n' character
-const MINUTES     = 30;
+const MINUTES     = 60000; // 1 minute in ms
+const SECONDS     = 1000;  // 1 second in ms
 
 const EMOJI_CODES = {
     "green": {
@@ -111,6 +113,10 @@ module.exports = {
 
         const offset = Math.ceil(randomInt(NUM_LINES) / NUM_BYTES) * NUM_BYTES;
         const wordsPath = path.join(ROOT, 'words.txt');
+        let players = [];
+        let queue = 10;
+        let guesses = 0;
+        let word;
         let matrix = [
             '<:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086>',
             '<:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086>',
@@ -118,24 +124,18 @@ module.exports = {
             '<:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086>',
             '<:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086><:flat:1046193584988246086>',
         ];
-        let players = [];
-        let queue = 10;
-        let duration = 60000 * MINUTES;
-        let guesses = 0;
-        let word;
 
-        // initialize game word
         fs.open(wordsPath, (err, fd) => {
             if (err) {
                 if (err.code === 'ENOENT') {
                     console.error(`[ERROR] ${wordsPath} does not exist!`);
                     return;
                 }
-
+    
                 console.error(`[ERROR] Unable to open ${wordsPath}`, err);
                 throw err;
             }
-
+    
             try {
                 let buffer = Buffer.alloc(NUM_LETTERS);
                 fs.read(fd, buffer, 0, NUM_LETTERS, offset, (err, bytesRead, buf) => {
@@ -154,20 +154,19 @@ module.exports = {
                 })
             }
         });
-
+        
         const reactionFilter = (reaction, user) => {
-            return reaction.emoji.name === '✅';
+            return reaction.emoji.name === '✅' && !user.bot;
         };
 
-        const queueCollector = initial.createReactionCollector({ filter: reactionFilter, max: 11, time: 10000 });
+        const queueCollector = initial.createReactionCollector({ filter: reactionFilter, max: 11, time: 10 * SECONDS });
 
         queueCollector.on('collect', (reaction, user) => {
             players.push(user.id);
         });
 
-        queueCollector.on('end', collected => {
+        queueCollector.on('end', (collected, reason) => {
             console.log(word);
-            duration = 60000 * MINUTES; // 30 minutes
 
             interaction.editReply('This Wordle will no longer take any more players... The game will begin shortly!');
             interaction.followUp(matrix.join('\n'));
@@ -176,7 +175,7 @@ module.exports = {
                 return message.content.length == NUM_LETTERS && players.includes(message.member.id)
             };
 
-            let messageCollector = interaction.channel.createMessageCollector({ filter: messageFilter, time: duration })
+            let messageCollector = interaction.channel.createMessageCollector({ filter: messageFilter, time: 30 * MINUTES })
 
             messageCollector.on('collect', message => {
                 const input = message.content.toLowerCase();
@@ -200,19 +199,43 @@ module.exports = {
                 guesses++;
 
                 if (input === word) {
-                    interaction.followUp(`You guessed **${word}** in ${guesses} tries!`);
-                    return messageCollector.stop()
+                    interaction.followUp(`${message.member.user.tag} guessed **${word}** after ${guesses} tries!`);
+                    return messageCollector.stop(`win ${guesses}`)
                 }
 
                 if (guesses >= matrix.length) {
                     interaction.followUp(`You failed to solve **${word}** in ${matrix.length} tries!`);
-                    return messageCollector.stop()
+                    return messageCollector.stop(`loss ${guesses}`)
                 }
             });
 
-            messageCollector.on('end', reason => {
+            messageCollector.on('end', async (collected, reason) => {
                 if (reason === 'time') {
                     return interaction.followUp('This Wordle has expired.');
+                }
+
+                const [ verdict, guesses ] = reason.split(' ');
+
+                for (const player of players) {
+                    const [member, created] = await DATABASE.findOrCreate({
+                        where: {
+                            guild: interaction.guildId,
+                            member: player
+                        },
+                        defaults: {
+                            games: 1,
+                            wins: (verdict === 'win') ? 1 : 0,
+                            guesses: parseInt(guesses)
+                        }
+                    });
+
+                    if (!created) {
+                        member.increment({
+                            games: 1,
+                            wins: (verdict === 'win') ? 1 : 0,
+                            guesses: parseInt(guesses)
+                        });
+                    }
                 }
             });
         });
