@@ -180,6 +180,16 @@ module.exports = {
             messageCollector.on('collect', message => {
                 const input = message.content.toLowerCase();
                 let guess = [];
+                let frequency = {};
+
+                for (let i = 0; i < word.length; i++) {
+                    let character = word.charAt(i);
+                    if (frequency[character]) {
+                        frequency[character]++;
+                    } else {
+                        frequency[character] = 1;
+                    }
+                }
 
                 for (let i = 0; i < NUM_LETTERS; i++) {
                     let guessLetter = input.charAt(i);
@@ -187,8 +197,10 @@ module.exports = {
 
                     if (guessLetter === solutionLetter) {
                         guess.push(EMOJI_CODES['green'][guessLetter]);
-                    } else if (word.includes(guessLetter)) {
+                        frequency[guessLetter]--;
+                    } else if (word.includes(guessLetter) && frequency[guessLetter] > 0) {
                         guess.push(EMOJI_CODES['yellow'][guessLetter]);
+                        frequency[guessLetter]--;
                     } else {
                         guess.push(EMOJI_CODES['gray'][guessLetter]);
                     }
@@ -199,7 +211,7 @@ module.exports = {
                 guesses++;
 
                 if (input === word) {
-                    interaction.followUp(`${message.member.user.tag} guessed **${word}** after ${guesses} tries!`);
+                    interaction.followUp(`${message.member.user.tag} solved **${word}** after ${guesses} tries!`);
                     return messageCollector.stop(`win ${guesses}`)
                 }
 
